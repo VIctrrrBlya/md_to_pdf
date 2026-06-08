@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown to PDF</title>
+
+<!-- Google Fonts (loaded from CDN). Add more by appending family names below. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Lora:wght@400;700&family=Merriweather:wght@400;700&family=Roboto:wght@400;700&family=Playfair+Display:wght@400;700&family=Source+Code+Pro&family=JetBrains+Mono&display=swap" rel="stylesheet">
+
+<!-- Markdown parser -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<!-- HTML -> PDF (bundles jsPDF + html2canvas) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<h2>Markdown → PDF</h2>
+
+<p>
+  <label>Heading font:
+    <select id="headingFont"></select>
+  </label>
+  &nbsp;
+  <label>Body font:
+    <select id="bodyFont"></select>
+  </label>
+  &nbsp;
+  <label>Code font:
+    <select id="codeFont"></select>
+  </label>
+  &nbsp;
+  <label>Body size:
+    <input id="bodySize" type="number" value="12" min="6" max="32" style="width:4em"> pt
+  </label>
+</p>
+
+<p>
+  <textarea id="md" rows="16" cols="80" placeholder="Paste your markdown here..."># Hello
+
+This is a **markdown** to PDF converter.
+
+## Features
+
+- Pick fonts for headings, body and code
+- Loads everything from a CDN
+- Static, no build step
+
+> A blockquote example.
+
+```
+code block uses the code font
+```
+</textarea>
+</p>
+
+<p>
+  <label>File name:
+    <input id="fileName" type="text" value="document">
+  </label>
+  &nbsp;
+  <button id="download">Download PDF</button>
+  <button id="preview">Refresh preview</button>
+</p>
+
+<hr>
+
+<!-- Rendered output that gets converted to PDF -->
+<div id="render"></div>
+
+<script>
+// Available fonts. The value is the CSS font-family stack.
+// To add a font: load it in the <link> above (for Google fonts), then add an entry here.
+const FONTS = [
+  ["Inter (sans)",        "'Inter', sans-serif"],
+  ["Roboto (sans)",       "'Roboto', sans-serif"],
+  ["Lora (serif)",        "'Lora', serif"],
+  ["Merriweather (serif)","'Merriweather', serif"],
+  ["Playfair (serif)",    "'Playfair Display', serif"],
+  ["Georgia (serif)",     "Georgia, serif"],
+  ["Arial (sans)",        "Arial, Helvetica, sans-serif"],
+  ["Times (serif)",       "'Times New Roman', Times, serif"],
+  ["Source Code Pro",     "'Source Code Pro', monospace"],
+  ["JetBrains Mono",      "'JetBrains Mono', monospace"],
+  ["Courier",             "'Courier New', monospace"],
+];
+
+function fillSelect(id, defaultIdx) {
+  const sel = document.getElementById(id);
+  FONTS.forEach(([label, stack], i) => {
+    const o = document.createElement('option');
+    o.value = stack;
+    o.textContent = label;
+    if (i === defaultIdx) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+fillSelect('headingFont', 4); // Playfair
+fillSelect('bodyFont', 2);    // Lora
+fillSelect('codeFont', 8);    // Source Code Pro
+
+function buildHtml() {
+  const md = document.getElementById('md').value;
+  const headingFont = document.getElementById('headingFont').value;
+  const bodyFont = document.getElementById('bodyFont').value;
+  const codeFont = document.getElementById('codeFont').value;
+  const bodySize = document.getElementById('bodySize').value;
+
+  const html = marked.parse(md);
+
+  const render = document.getElementById('render');
+  render.innerHTML = html;
+
+  // Apply fonts via inline styles so html2canvas captures them reliably.
+  Object.assign(render.style, {
+    fontFamily: bodyFont,
+    fontSize: bodySize + 'pt',
+    lineHeight: '1.5',
+    color: '#000',
+    background: '#fff',
+    padding: '40px',
+    boxSizing: 'border-box',
+    width: '794px' // ~ A4 width at 96dpi, keeps layout consistent
+  });
+
+  render.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(el => {
+    el.style.fontFamily = headingFont;
+  });
+  render.querySelectorAll('code,pre,pre code').forEach(el => {
+    el.style.fontFamily = codeFont;
+  });
+  render.querySelectorAll('pre').forEach(el => {
+    el.style.background = '#f4f4f4';
+    el.style.padding = '12px';
+    el.style.whiteSpace = 'pre-wrap';
+    el.style.wordWrap = 'break-word';
+  });
+  render.querySelectorAll('code').forEach(el => {
+    if (!el.closest('pre')) el.style.background = '#f4f4f4';
+  });
+  render.querySelectorAll('blockquote').forEach(el => {
+    el.style.borderLeft = '4px solid #ccc';
+    el.style.margin = '0';
+    el.style.paddingLeft = '16px';
+    el.style.color = '#555';
+  });
+  render.querySelectorAll('table').forEach(el => {
+    el.style.borderCollapse = 'collapse';
+  });
+  render.querySelectorAll('th,td').forEach(el => {
+    el.style.border = '1px solid #ccc';
+    el.style.padding = '6px 10px';
+  });
+  render.querySelectorAll('img').forEach(el => {
+    el.style.maxWidth = '100%';
+  });
+}
+
+async function ensureFontsLoaded() {
+  // Wait for chosen web fonts to be ready so they render in the PDF.
+  if (document.fonts && document.fonts.ready) {
+    try { await document.fonts.ready; } catch (e) {}
+  }
+}
+
+document.getElementById('preview').addEventListener('click', buildHtml);
+
+document.getElementById('download').addEventListener('click', async () => {
+  buildHtml();
+  await ensureFontsLoaded();
+
+  const name = (document.getElementById('fileName').value || 'document').trim();
+  const el = document.getElementById('render');
+
+  const opt = {
+    margin: 0,
+    filename: name + '.pdf',
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+
+  html2pdf().set(opt).from(el).save();
+});
+
+// Initial render
+buildHtml();
+</script>
+
+</body>
+</html>
