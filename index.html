@@ -75,6 +75,18 @@ code block uses the code font
 <div id="render"></div>
 
 <script>
+
+  {
+    let cached = localStorage.getItem('cache');
+    if (cached) {
+      document.getElementById('md').value = cached;
+    }
+  }
+
+  document.getElementById('md').addEventListener('change', () => {
+      let v = document.getElementById('md').value;
+      localStorage.setItem('cache', v);
+  });
 // Available fonts. The value is the CSS font-family stack.
 // To add a font: load it in the <link> above (for Google fonts), then add an entry here.
 const FONTS = [
