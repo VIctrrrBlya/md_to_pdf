@@ -61,6 +61,10 @@ code block uses the code font
     <input id="fileName" type="text" value="document">
   </label>
   &nbsp;
+  <label>
+    <input id="singlePage" type="checkbox"> Single page (don't split)
+  </label>
+  &nbsp;
   <button id="download">Download PDF</button>
   <button id="preview">Refresh preview</button>
 </p>
@@ -174,13 +178,19 @@ document.getElementById('download').addEventListener('click', async () => {
   const name = (document.getElementById('fileName').value || 'document').trim();
   const el = document.getElementById('render');
 
+  // Size the PDF page to the exact content dimensions so it is ONE continuous
+  // page with no splitting. Wait a tick so layout/height is final.
+  await new Promise(r => requestAnimationFrame(r));
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+
   const opt = {
     margin: 0,
     filename: name + '.pdf',
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    html2canvas: { scale: 2, useCORS: true, windowWidth: w },
+    jsPDF: { unit: 'px', format: [w, h], orientation: w > h ? 'landscape' : 'portrait' },
+    pagebreak: { mode: ['avoid-all'] }
   };
 
   html2pdf().set(opt).from(el).save();
